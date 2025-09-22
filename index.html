@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Naruto — 3v3 Turn-Based (Chakra RPS)</title>
+  <style>
+    :root{
+      --bg:#0c0f16; --fg:#e8eefc; --muted:#9fb3ff; --accent:#7ee787; --warn:#ff7b72; --panel:#121728; --chip:#1a2035;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#0a0f1f;border-bottom:1px solid #1c2440;position:sticky;top:0;z-index:2}
+    h1{margin:0;font-size:16px;letter-spacing:.4px}
+    main{display:grid;grid-template-columns:320px 1fr;gap:12px;padding:12px}
+    .panel{background:var(--panel);border:1px solid #1c2440;border-radius:14px;padding:12px}
+    .roster{height:calc(100vh - 96px);overflow:auto}
+    .search{display:flex;gap:8px;margin-bottom:10px}
+    .search input{flex:1;padding:8px 10px;border-radius:10px;border:1px solid #273055;background:#0f1526;color:var(--fg)}
+    .card{background:var(--chip);border:1px solid #273055;border-radius:12px;padding:10px;margin-bottom:8px}
+    .card h3{margin:0 0 6px 0;font-size:14px}
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+    .chip{padding:2px 8px;border-radius:999px;background:#0f162a;border:1px solid #2a335a;font-size:12px}
+    .pick{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .pick button,.btn{padding:6px 10px;border-radius:10px;border:1px solid #2c3663;background:#121a33;color:var(--fg);cursor:pointer}
+    .pick button:disabled{opacity:.4;cursor:not-allowed}
+    .btn.primary{background:#16294d;border-color:#3a62c7}
+    .btn.good{background:#143219;border-color:#2c7a3e}
+    .btn.bad{background:#3a1618;border-color:#8a3034}
+    .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .teams{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .fighter{padding:10px;border-radius:12px;background:#0f1526;border:1px solid #2a335a;margin-bottom:8px}
+    .fighter h4{margin:0 0 8px 0;font-size:14px}
+    .hpbar{height:10px;background:#1a2138;border:1px solid #2a335a;border-radius:999px;overflow:hidden}
+    .hpfill{height:100%;background:linear-gradient(90deg,#3ad29f,#7ee787)}
+    .row{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .col{flex:1;min-width:260px}
+    .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+    .targets{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .log{height:200px;overflow:auto;background:#0a0f1f;border:1px solid #1c2440;border-radius:10px;padding:8px;font-family:ui-monospace,Consolas,monospace}
+    .draft{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+    .pill{padding:4px 8px;border-radius:999px;background:#0f162a;border:1px solid #2a335a}
+    .you{color:#8fd7a3}
+    .ai{color:#c79bff}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Naruto — 3v3 Turn-Based • Chakra RPS</h1>
+  <div class="flex">
+    <span class="pill">Wind ▶ Lightning</span>
+    <span class="pill">Lightning ▶ Earth</span>
+    <span class="pill">Earth ▶ Water</span>
+    <span class="pill">Water ▶ Fire</span>
+    <span class="pill">Fire ▶ Wind</span>
+  </div>
+</header>
+
+<main>
+  <section class="panel roster">
+    <div class="search">
+      <input id="search" placeholder="Search characters… (name or element)"/>
+      <button class="btn" id="resetDraft">Reset Draft</button>
+    </div>
+    <div id="rosterList"></div>
+  </section>
+
+  <section class="panel">
+    <div id="stageDraft">
+      <h2>Draft Your 3 Shinobi</h2>
+      <p>Click characters from the left to add them to your team. The AI will auto-draft after you pick each one.</p>
+      <div class="draft"><strong>Your team:</strong> <span id="yourDraft" class="you"></span></div>
+      <div class="draft"><strong>AI team:</strong> <span id="aiDraft" class="ai"></span></div>
+      <button class="btn primary" id="beginBattle" disabled>Begin Battle</button>
+    </div>
+
+    <div id="stageBattle" style="display:none">
+      <div class="teams">
+        <div class="col">
+          <h3>Your Team</h3>
+          <div id="yourTeam"></div>
+        </div>
+        <div class="col">
+          <h3>AI Team</h3>
+          <div id="aiTeam"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <div class="row">
+          <div class="col">
+            <h3>Your Move</h3>
+            <div id="yourMoveArea">
+              <div class="flex">
+                <label for="actorSel">Fighter:</label>
+                <select id="actorSel"></select>
+              </div>
+              <div class="actions" id="moveBtns"></div>
+              <div>
+                <div style="margin:8px 0 4px">Target enemy:</div>
+                <div class="targets" id="targetBtns"></div>
+              </div>
+              <div class="flex" style="margin-top:8px">
+                <button class="btn" id="endTurn" disabled>End Turn</button>
+                <button class="btn" id="autoPlay">Auto (AI vs AI)</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <h3>Battle Log</h3>
+            <div class="log" id="log"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="winner" style="display:none;margin-top:8px;font-size:16px"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Scripts -->
+<script src="roster.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
